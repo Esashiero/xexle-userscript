@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Xexle Community Stats v35
 // @namespace    https://xexle.com/scripts/
-// @version      35.0.7
+// @version      35.0.8
 // @description  Community page: badges, scroll-crawl, filters, gallery grid view, recent sort, saved searches, retry queue.
 // @author       shiro
 // @match        https://xexle.com/community*
@@ -94,10 +94,15 @@
     // exact envelope key xexle uses.
     function looksLikeVideoItem(o) {
         if (!o || typeof o !== 'object') return false;
-        if (o.id === undefined && o._id === undefined) return false;
+        const hasId = (o.id !== undefined || o._id !== undefined || o.cid !== undefined ||
+                      o.contentId !== undefined || o.content_id !== undefined ||
+                      o.objectId !== undefined || o.object_id !== undefined);
+        if (!hasId) return false;
         return (o.title !== undefined || o.filePath !== undefined ||
                 o.previewPicPath !== undefined || o.previewVideoPath !== undefined ||
-                o.fileDuration !== undefined || o.contentId !== undefined);
+                o.fileDuration !== undefined || o.contentId !== undefined ||
+                o.previewVideo !== undefined || o.previewPic !== undefined ||
+                o.pic !== undefined || o.video !== undefined || o.thumb !== undefined);
     }
     function findVideoArrays(node, depth, found) {
         try {
@@ -115,14 +120,14 @@
     }
     function maybeCapture(body, json) {
         try {
-            if (!/(getFolder|getFolders|getContent|getFolderMeta|favorite|search|content)/i.test(body || '')) return;
             const found = [];
             findVideoArrays(json, 0, found);
             if (!found.length) return;
             // pick the largest video array
             found.sort((a, b) => b.length - a.length);
             const list = found[0];
-            const m = /folderId=(\d+)/.exec(body || '');
+            const b = String(body || '');
+            const m = /folderId=(\d+)/.exec(b);
             const fid = m ? parseInt(m[1], 10) : null;
             pushItems(list, fid);
         } catch (e) { /* never break the page */ }
@@ -134,7 +139,7 @@
         window.fetch = async (input, init) => {
             const resp = await orig(input, init);
             try {
-                const reqBody = typeof input === 'string' ? input : (init && init.body) || '';
+                const reqBody = String(typeof input === 'string' ? input : (init && init.body) || '');
                 if (/(xexle\.com\/api|api\.xexle\.com)/i.test(typeof input === 'string' ? input : (input && input.url) || '')) {
                     const clone = resp.clone();
                     const txt = await clone.text();
@@ -158,7 +163,7 @@
             };
             const realSend = xhr.send;
             xhr.send = function (body) {
-                reqBody = body || '';
+                reqBody = String(body || '');
                 return realSend.apply(this, arguments);
             };
             xhr.addEventListener('load', function () {

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xexle Frontend</title>
+<style>
+  :root {
+    --bg: #1a120c; --panel: #dbc1ac; --dark: #553b25; --darker: #3d2a1a;
+    --light: #f5e7dc; --lighter: #f0e2d6; --accent: #c9704a; --ok: #4a7c59;
+    --text: #2b1d10;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); font-family:sans-serif; color:#eee; }
+  header { position:sticky; top:0; z-index:50; background:var(--dark); padding:8px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; box-shadow:0 2px 6px rgba(0,0,0,.5); }
+  header h1 { font-size:1rem; margin:0 12px 0 0; color:var(--light); letter-spacing:.5px; }
+  header input[type=text], header select, header button {
+    background:var(--light); color:var(--text); border:1px solid var(--dark); border-radius:5px; padding:5px 9px; font-size:.85rem;
+  }
+  header button { cursor:pointer; font-weight:bold; }
+  header button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #session-in { width:230px; }
+  main { max-width:1700px; margin:0 auto; padding:14px; }
+
+  /* ===== panel / status ===== */
+  .toolbar-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .toolbar-row label { font-size:.8rem; opacity:.85; }
+  #status { margin-left:auto; font-size:.78rem; font-style:italic; opacity:.75; min-width:200px; text-align:right; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .chip { background:var(--panel); color:var(--text); border-radius:11px; padding:2px 10px; font-size:.76rem; cursor:pointer; user-select:none; border:1px solid var(--dark); }
+  .chip b { margin-left:5px; color:#a00; }
+
+  /* ===== user cards grid ===== */
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:2px solid var(--dark); border-radius:8px; overflow:hidden; color:var(--text); }
+  .card-head { display:flex; align-items:center; gap:9px; padding:8px 11px; background:var(--dark); color:#fff; cursor:pointer; }
+  .card-head:hover { background:var(--darker); }
+  .avatar { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-weight:bold; background:#fff; color:var(--dark); flex:none; overflow:hidden; }
+  .avatar img { width:100%; height:100%; object-fit:cover; }
+  .card-head .nm { font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .card-head .tv { margin-left:auto; font-size:.78rem; opacity:.92; white-space:nowrap; }
+  .dates { padding:3px 11px; font-size:.68rem; background:var(--lighter); border-bottom:1px solid #c9ab93; color:var(--dark); }
+  .thumbs { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; background:var(--dark); padding:2px; min-height:90px; }
+  .thumb { position:relative; aspect-ratio:16/9.6; overflow:hidden; background:#eee; text-decoration:none; cursor:pointer; display:block; }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .thumb .ct { position:absolute; bottom:18px; right:3px; background:rgba(255,255,255,.87); color:#000; font-size:.63rem; border-radius:4px; padding:0 4px; }
+  .thumb .ti { position:absolute; bottom:0; left:0; right:0; background:rgba(242,242,242,.93); color:#111; font-size:.77rem; font-weight:bold; text-align:center; padding:2px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .thumb.more::after { content:'+'attr(data-n); position:absolute; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.45); color:#fff; font-size:1.2rem; font-weight:bold; }
+  .thumb.blank { background:rgba(255,255,255,.06); }
+  .empty { grid-column:1/-1; text-align:center; padding:34px; color:var(--panel); }
+
+  /* ===== gallery view (folder contents) ===== */
+  #gallery-view { display:none; }
+  #gallery-view.show { display:block; }
+  #gv-head { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  #gv-head h2 { margin:0; font-size:1.05rem; color:var(--panel); }
+  #gv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; }
+  .vcard { background:var(--panel); border:2px solid var(--dark); border-radius:7px; overflow:hidden; color:var(--text); cursor:pointer; transition:transform .08s; }
+  .vcard:hover { transform:translateY(-2px); }
+  .vcard .vp { position:relative; aspect-ratio:16/9; background:#222; }
+  .vcard .vp img { width:100%; height:100%; object-fit:cover; display:block; }
+  .vcard .dur { position:absolute; bottom:3px; right:3px; background:rgba(0,0,0,.75); color:#fff; font-size:.66rem; padding:0 4px; border-radius:3px; }
+  .vcard .q { position:absolute; top:3px; left:3px; background:var(--accent); color:#fff; font-size:.62rem; padding:0 4px; border-radius:3px; font-weight:bold; }
+  .vcard .prem { position:absolute; top:3px; right:3px; background:#b89a1f; color:#fff; font-size:.62rem; padding:0 4px; border-radius:3px; font-weight:bold; }
+  .vcard .meta { padding:5px 7px; font-size:.72rem; line-height:1.35; }
+  .vcard .meta b { font-size:.76rem; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vcard .meta .views { opacity:.65; }
+
+  /* ===== player overlay ===== */
+  #overlay { position:fixed; inset:0; background:rgba(10,6,3,.92); z-index:100; display:none; place-items:center; }
+  #overlay.show { display:grid; }
+  #overlay-inner { width:min(94vw,1100px); }
+  #overlay video { width:100%; max-height:80vh; background:#000; border-radius:6px; outline:none; }
+  #ov-meta { color:var(--panel); font-size:.85rem; margin-top:8px; display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  #ov-close { float:right; cursor:pointer; font-size:1.4rem; color:#fff; background:none; border:none; margin-bottom:4px; }
+  #ov-dl { color:var(--accent); font-size:.82rem; }
+
+  /* ===== content search tab ===== */
+  #search-view { display:none; }
+  #search-view.show { display:block; }
+
+  .badge-fail { font-style:italic; opacity:.6; }
+  #sentinel { grid-column:1/-1; height:8px; }
+  a.plainlink { color:inherit; text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>XEXLE FRONTEND</h1>
+  <select id="tab">
+    <option value="community">Community</option>
+    <option value="search">Content search</option>
+  </select>
+  <input id="session-in" type="password" placeholder="session (userId:token) — optional">
+  <button id="sess-save">Save session</button>
+  <span id="whoami" style="font-size:.78rem;opacity:.8;"></span>
+</header>
+
+<main>
+  <!-- ============ COMMUNITY TAB ============ -->
+  <section id="community-view">
+    <div class="toolbar-row">
+      <button id="load-list">Load community list</button>
+      <input id="min-videos" type="number" placeholder="Min videos" style="width:100px;background:var(--light);border:1px solid var(--dark);border-radius:5px;padding:5px;">
+      <input id="txt-search" type="text" placeholder="Search title/description" style="min-width:190px;background:var(--light);border:1px solid var(--dark);border-radius:5px;padding:5px;">
+      <select id="gal-filter"><option value="">All galleries</option></select>
+      <select id="sort-mode">
+        <option value="default">Sort: most videos</option>
+        <option value="recent">Sort: recent activity</option>
+      </select>
+      <button id="export-btn">Export JSON</button>
+      <span id="counter" style="font-size:.78rem;opacity:.75;"></span>
+      <span id="status">Ready</span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div id="grid"></div>
+  </section>
+
+  <!-- ============ SEARCH TAB ============ -->
+  <section id="search-view">
+    <div class="toolbar-row">
+      <input id="cs-text" type="text" placeholder="Search videos…" style="flex:1;min-width:220px;background:var(--light);border:1px solid var(--dark);border-radius:5px;padding:6px;">
+      <select id="cs-menu">
+        <option>All</option><option>sfhardcore</option><option>sfporn</option>
+        <option>sfnotporn</option><option>sfshocking</option><option>sfsissy</option><option>sfunsorted</option>
+      </select>
+      <select id="cs-type"><option>All</option><option>Video</option><option>Image</option></select>
+      <button id="cs-go">Search</button>
+    </div>
+    <div class="chips" id="saved-searches"></div>
+    <div id="cs-grid"></div>
+  </section>
+
+  <!-- ============ GALLERY VIEW ============ -->
+  <section id="gallery-view">
+    <div id="gv-head">
+      <button id="gv-back">&larr; Back to community</button>
+      <h2 id="gv-title">Gallery</h2>
+      <span id="gv-count" style="font-size:.8rem;opacity:.75;"></span>
+    </div>
+    <div id="gv-grid"></div>
+  </section>
+</main>
+
+<div id="overlay">
+  <div id="overlay-inner">
+    <button id="ov-close">&#10005;</button>
+    <video id="ov-player" controls autoplay muted playsinline></video>
+    <div id="ov-meta"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================================================================
+   Xexle standalone frontend
+   - POST https://xexle.com/api/  body: query=...&...  (CORS: *)
+   - IndexedDB cache of crawled users (same shape as userscript)
+   ================================================================ */
+const API = 'https://xexle.com/api/';
+const DB_NAME = 'XexleCommunityDB', DB_VERSION = 3, STORE = 'users';
+const CRAWL_DELAY_MS = 300, STALE_MS = 7*24*3600*1000, FAIL_MAX = 3, FAIL_COOLDOWN_MS = 24*3600*1000;
+const LS_SESSION = 'xf_session', LS_SAVED = 'xf_saved_searches', LS_CS_SAVED = 'xf_cs_saved';
+
+let db = null, SESSION = '';
+const state = { users:[], listIds:[], MIN_VIDEOS:0, SEARCH:'', GALLERY_FILTER:'', SORT_MODE:'default', rendered:0 };
+let gvPage = 0, gvFolderId = null, gvTitle = '', gvLoadingMore = false;
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const setStatus = m => { $('status').textContent = m; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = e => { if (!e) return 'unknown'; const d = new Date(e*1000); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; };
+
+async function api(params) {
+  if (SESSION) params.session = SESSION;
+  const body = new URLSearchParams(params).toString();
+  const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
+  return r.json();
+}
+
+/* ---------- IndexedDB (shared store name with the userscript) ---------- */
+function openDB() {
+  return new Promise((res, rej) => {
+    if (db) return res(db);
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => { const d = e.target.result; if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath:'username' }); };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej('DB error');
+  });
+}
+const tx = mode => db.transaction(STORE, mode).objectStore(STORE);
+const dbGet = u => new Promise(r => { const q = tx('readonly').get(u); q.onsuccess = () => r(q.result); q.onerror = () => r(null); });
+const dbPut = rec => new Promise(r => { const q = tx('readwrite').put(rec); q.onsuccess = r; q.onerror = r; });
+const dbAll = () => new Promise(r => { const q = tx('readonly').getAll(); q.onsuccess = () => r(q.result||[]); q.onerror = () => r([]); });
+
+/* ---------- crawling ---------- */
+function parseFolders(listObj) {
+  let total = 0;
+  const galleries = Object.values(listObj).map(g => ({
+    folderId:g.folderId, title:String(g.title ?? 'Unknown'), count:parseInt(g.count,10)||0,
+    avatar:g.avatar||'', created:g.created||null, lastDt:(g.last && g.last.dt)||null
+  })).sort((a,b)=>b.count-a.count);
+  galleries.forEach(g => total += g.count);
+  return { total, galleries };
+}
+const recActivity = rec => Math.max(0, ...(rec.galleries||[]).map(g => Math.max(g.lastDt||0, g.created||0)));
+const isStale = rec => !rec.lastCrawled || (Date.now()-rec.lastCrawled) > STALE_MS;
+const isFailedOut = rec => (rec.failCount||0) >= FAIL_MAX && (Date.now()-(rec.lastAttempt||0)) < FAIL_COOLDOWN_MS;
+
+async function crawlUser(username, force=false) {
+  await openDB();
+  let cached = force ? null : await dbGet(username);
+  if (cached && cached.total !== undefined && !isStale(cached)) return cached;
+  if (cached && isFailedOut(cached)) return cached;
+  try {
+    const j = await api({ query:'usersFavoriteContent.getFolders', user:username });
+    if (j.status && j.data && j.data.list) {
+      const { total, galleries } = parseFolders(j.data.list);
+      // try to enrich description/avatar from community payload first, fall back to profile-less rec
+      const known = state.usersData?.[findUserId(username)] || {};
+      const rec = { username, total, galleries, lastCrawled:Date.now(), failCount:0,
+                    description:(cached&&cached.description)||known.description||'',
+                    avatar:(cached&&cached.avatar)||known.avatar||'' };
+      await dbPut(rec);
+      return rec;
+    }
+  } catch(e){}
+  const fc = ((cached&&cached.failCount)||0)+1;
+  const rec = { ...(cached||{username}), username, failCount:fc, lastAttempt:Date.now(),
+                total:(cached&&cached.total), galleries:(cached&&cached.galleries)||[] };
+  await dbPut(rec);
+  return rec.total !== undefined ? cached || rec : { ...rec, fail:true };
+}
+const findUserId = uname => Object.entries(state.usersData||{}).find(([,v])=>v.username===uname)?.[0];
+
+/* ---------- community list ---------- */
+async function loadCommunityList(force=false) {
+  setStatus('Loading community list…');
+  try {
+    const j = await api({ query:'community.getList', type:'interesting' });
+    if (!j.status || !j.data) throw new Error(j.message||'bad response');
+    state.listIds = j.data.lists || [];
+    state.usersData = j.data.usersData || {};
+    state.subscribed = j.data.subscribed || [];
+    $('counter').textContent = `${state.listIds.length} listed / ${j.data.searchableCount ?? '?'} searchable`;
+    await Promise.all(state.listIds.slice(0,40).map(async uid => {
+      const d = state.usersData[uid]; if (!d) return;
+      await openDB();
+      const existing = await dbGet(d.username);
+      await dbPut({ ...(existing||{username:d.username}), username:d.username,
+                    description:d.description||'', avatar:d.avatar||'' });
+    }));
+    await renderCommunity(force);
+    setStatus('Ready');
+  } catch(e) { setStatus('Failed: '+e.message); }
+}
+
+async function renderCommunity(reset=true) {
+  await openDB();
+  const all = (await dbAll()).filter(rec => !rec.failCount || rec.total !== undefined || !isFailedOut(rec));
+  state.pool = all;
+  applyFilters(reset);
+}
+
+function matchesFilters(rec) {
+  if (!rec || rec.total === undefined) return false;
+  if ((rec.total||0) < state.MIN_VIDEOS) return false;
+  if (state.GALLERY_FILTER && !(rec.galleries||[]).some(g=>g.title===state.GALLERY_FILTER)) return false;
+  if (state.SEARCH && !(((rec.description||'').toLowerCase().includes(state.SEARCH)) ||
+      (rec.galleries||[]).some(g=>g.title.toLowerCase().includes(state.SEARCH)))) return false;
+  return true;
+}
+
+function filteredSorted() {
+  const f = (state.pool||[]).filter(matchesFilters);
+  if (state.SORT_MODE==='recent') f.sort((a,b)=>recActivity(b)-recActivity(a));
+  else f.sort((a,b)=>(b.total||0)-(a.total||0));
+  return f;
+}
+
+/* ---------- card rendering ---------- */
+function cardHTML(rec) {
+  const gal = (rec.galleries||[]);
+  const named = gal.filter(g => !/^my favorites$|^watch later$/i.test(g.title));
+  const show = (named.length?named:gal).slice(0,3);
+  while (show.length<3) show.push(null);
+  const thumbs = show.map(g => g ? `
+    <div class="thumb" data-folder="${g.folderId}" data-title="${esc(g.title)}" data-user="${esc(rec.username)}">
+      ${g.avatar?`<img loading="lazy" src="${esc(g.avatar)}" alt="">`:''}
+      <span class="ct">${g.count}</span><span class="ti">${esc(g.title)}</span>
+    </div>` : `<div class="thumb blank"></div>`).join('');
+  const extra = gal.length-3;
+  const av = rec.avatar ? `<img src="${esc(rec.avatar)}" alt="">` : esc((rec.username[0]||'?').toUpperCase());
+  const act = recActivity(rec);
+  return `<div class="card" data-user="${esc(rec.username)}">
+    <div class="card-head" data-user="${esc(rec.username)}">
+      <span class="avatar">${av}</span><span class="nm">${esc(rec.username)}</span>
+      <span class="tv">${rec.total} videos</span>
+    </div>
+    <div class="dates">last activity: ${fmtDate(act)} &middot; ${gal.length} galleries</div>
+    <div class="thumbs">${extra>0?`<div class="thumb more blank" data-n="${extra}"></div>`:''}${thumbs}</div>
+  </div>`;
+}
+
+function renderGridChunk(reset) {
+  const g = $('grid');
+  const recs = filteredSorted();
+  if (reset) { g.innerHTML=''; state.rendered=0; }
+  const CHUNK = 30;
+  const chunk = recs.slice(state.rendered, state.rendered+CHUNK);
+  const sent = $('sentinel'); if (sent) sent.remove();
+  if (reset && !chunk.length) {
+    g.innerHTML = `<div class="empty">No crawled users match. Hit "Load community list" then scroll — new users are crawled as cards appear.</div>`;
+    state.rendered = 0;
+    return recs.length;
+  }
+  g.insertAdjacentHTML('beforeend', chunk.map(cardHTML).join(''));
+  state.rendered += chunk.length;
+  if (state.rendered < recs.length) g.insertAdjacentHTML('beforeend','<div id="sentinel"></div>');
+  hookCards();
+  $('counter').textContent = `${recs.length} shown / ${(state.pool||[]).length} cached`;
+  return recs.length;
+}
+
+function hookCards() {
+  document.querySelectorAll('.card-head[data-user]').forEach(h => {
+    if (h.__hooked) return; h.__hooked = true;
+    h.addEventListener('click', () => browseFirstFolder(h.dataset.user));
+  });
+  document.querySelectorAll('.thumb[data-folder]').forEach(t => {
+    if (t.__hooked) return; t.__hooked = true;
+    t.addEventListener('click', () => openGallery(parseInt(t.dataset.folder), t.dataset.title));
+  });
+}
+
+/* ---------- lazy crawl loop ---------- */
+setInterval(async () => {
+  if ($('community-view').offsetParent === null) return;
+  if (document.querySelector('#gallery-view.show') || document.querySelector('#search-view.show')) return;
+  const sent = $('sentinel');
+  if (!sent || state.__crawling) return;
+  if (sent.getBoundingClientRect().top > innerHeight + 800) return;
+  state.__crawling = true;
+  const pool = state.pool||[];
+  const done = new Set(filteredSorted().map(r=>r.username));
+  let n = 0;
+  for (const rec of pool) {
+    if (n >= 8) break;
+    if (done.has(rec.username)) continue;
+    if ((rec.failCount||0)>=FAIL_MAX && Date.now()-(rec.lastAttempt||0)<FAIL_COOLDOWN_MS) continue;
+    if (rec.lastCrawled && rec.total !== undefined && !isStale(rec)) continue;
+    setStatus(`Fetching ${rec.username}…`);
+    await crawlUser(rec.username);
+    n++;
+    await new Promise(r=>setTimeout(r,CRAWL_DELAY_MS));
+  }
+  if (n) { await renderCommunity(false); }
+  else renderGridChunk(true);
+  state.__crawling = false;
+  setStatus('Ready');
+}, 900);
+
+/* ---------- filters / chips ---------- */
+function applyFilters(reset=true) {
+  const galSel = $('gal-filter');
+  const freq = {};
+  (state.pool||[]).forEach(r => (r.galleries||[]).forEach(g => freq[g.title]=(freq[g.title]||0)+g.count));
+  const cur = galSel.value;
+  galSel.innerHTML = '<option value="">All galleries</option>' +
+    Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,200)
+      .map(([t])=>`<option>${esc(t)}</option>`).join('');
+  galSel.value = [...galSel.options].some(o=>o.value===cur) ? cur : '';
+  renderGridChunk(reset);
+}
+
+function getSaved(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } }
+function setSaved(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+function renderChips() {
+  $('chips').innerHTML = getSaved(LS_SAVED).map(q =>
+    `<span class="chip" data-q="${esc(q)}">${esc(q)}<b data-del="${esc(q)}">x</b></span>`).join('');
+  $('chips').querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', e => {
+    const del = e.target.dataset.del;
+    if (del) { setSaved(LS_SAVED, getSaved(LS_SAVED).filter(s=>s!==del)); renderChips(); return; }
+    $('txt-search').value = ch.dataset.q; state.SEARCH = ch.dataset.q.toLowerCase(); applyFilters();
+  }));
+}
+
+/* ---------- gallery (folder contents) ---------- */
+async function openGallery(folderId, title, page=0) {
+  showView('gallery');
+  gvFolderId = folderId; gvTitle = title; gvPage = page;
+  $('gv-title').textContent = title;
+  $('gv-count').textContent = '';
+  if (page===0) $('gv-grid').innerHTML='';
+  setStatus(`Loading ${title} p${page}…`);
+  try {
+    const p = { query:'usersFavoriteContent.getFolder', folderId:String(folderId), page:String(page) };
+    const j = await api(p);
+    if (!j.status || !j.data) throw new Error(j.message||'failed');
+    const items = extractItems(j.data);
+    $('gv-count').textContent = `${items.length} on page ${page}`;
+    if (!items.length && page===0) $('gv-grid').innerHTML = '<div class="empty" style="color:var(--panel)">Empty or private folder.</div>';
+    $('gv-grid').insertAdjacentHTML('beforeend', items.map(videoCardHTML).join(''));
+    hookVCards($('gv-grid'));
+    gvHasMore = items.length >= 30;
+    setStatus('Ready');
+  } catch(e){ setStatus('Gallery failed: '+e.message); }
+}
+let gvHasMore = false;
+
+function extractItems(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.list)) return data.list;
+  if (data.items && typeof data.items==='object') return Object.values(data.items);
+  return [];
+}
+
+function videoCardHTML(it) {
+  const pic = it.previewPicPath || (it.media?.preview?.poster?.url) || '';
+  const dur = it.publicDuration || fmtDur(it.fileDuration);
+  const q = it.publicQuality || (it.isHq?'HD':'');
+  return `<div class="vcard" data-id="${it._id||it.id}">
+    <div class="vp">
+      ${pic?`<img loading="lazy" src="${esc(pic)}" alt="">`:`<div style="display:grid;place-items:center;height:100%;color:#888;">no preview</div>`}
+      ${dur?`<span class="dur">${esc(dur)}</span>`:''}
+      ${q?`<span class="q">${esc(q)}</span>`:''}
+      ${it.premium==1||it.isPremium==1?`<span class="prem">PREM</span>`:''}
+    </div>
+    <div class="meta"><b>${esc(it.name||it.title||'Video')}</b>
+      <span class="views">${(it.views??0).toLocaleString()} views &middot; ${esc((it.tags||[]).slice(0,3).join(', '))}</span>
+    </div>
+  </div>`;
+}
+const fmtDur = s => { if(!s) return ''; const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60; return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+String(x).padStart(2,'0'); };
+
+function hookVCards(container) {
+  container.querySelectorAll('.vcard:not([__h])').forEach(c => {
+    c.setAttribute('__h','1');
+    c.addEventListener('click', () => playItem(c.dataset.id));
+  });
+}
+
+/* ---------- player ---------- */
+async function playItem(id) {
+  setStatus('Resolving media…');
+  try {
+    const j = await api({ query:'contentItems.getByIds', itemIds:String(id) });
+    let item = null;
+    const d = j.status ? j.data : null;
+    if (Array.isArray(d)) item = d.find(x=>String(x._id)===String(id));
+    else if (d && d.items) item = d.items[String(id)];
+    if (!item) throw new Error('item not found');
+    const url = item.filePath || item.mobilePath || item.media?.main?.url || '';
+    const ov = $('overlay'), v = $('ov-player');
+    ov.classList.add('show');
+    $('ov-meta').innerHTML =
+      `<b>${esc(item.name||item.title||id)}</b>
+       <span>${(item.views??0).toLocaleString()} views &middot; ${esc(item.publicDuration||'')} &middot; ${esc(item.publicQuality||'')}</span>
+       ${url?`<a id="ov-dl" href="${esc(url)}" target="_blank" rel="noopener">download</a>`
+            :'<span style="color:#b89a1f;font-weight:bold;">premium only — no free stream</span>'}
+       <a href="${esc(item.urlFull||('https://xexle.com/watch/'+id))}" target="_blank" rel="noopener">open on xexle</a>`;
+    if (url) { v.src = url; v.play().catch(()=>{}); }
+    else { v.removeAttribute('src'); v.poster = item.previewPicPath||''; }
+    api({ query:'content.addView', contentId:String(id) }).catch(()=>{});
+    setStatus('Ready');
+  } catch(e){ setStatus('Playback failed: '+e.message); alert('Could not resolve media: '+e.message); }
+}
+$('ov-close').addEventListener('click', () => {
+  $('overlay').classList.remove('show'); const v=$('ov-player'); v.pause(); v.removeAttribute('src');
+});
+$('overlay').addEventListener('click', e => { if (e.target.id==='overlay') $('ov-close').click(); });
+
+/* ---------- content search tab ---------- */
+async function runSearch(page=0) {
+  const text = $('cs-text').value.trim();
+  if (!text) return;
+  const menu = $('cs-menu').value, type = $('cs-type').value;
+  if (page===0) $('cs-grid').innerHTML='';
+  setStatus('Searching…');
+  try {
+    const j = await api({ query:'content.search', text, section:'search', menu, type,
+                          pars:'', count:'30', page:String(page), ab:'', mark:'' });
+    if (!j.status) throw new Error(j.message||'failed');
+    const items = extractItems(j.data);
+    if (!items.length && page===0) $('cs-grid').innerHTML = '<div class="empty">No results.</div>';
+    $('cs-grid').insertAdjacentHTML('beforeend', items.map(videoCardHTML).join(''));
+    hookVCards($('cs-grid'));
+    $('cs-grid').dataset.page = String(page);
+    csHasMore = items.length>=30; csLastQuery = {text,menu,type};
+    setStatus(`${items.length} results${page?', page '+page:''}`);
+  } catch(e){ setStatus('Search failed: '+e.message); }
+}
+let csHasMore=false, csLastQuery=null;
+
+function renderCsChips() {
+  $('saved-searches').innerHTML = getSaved(LS_CS_SAVED).map(q =>
+    `<span class="chip" data-q="${esc(q)}">${esc(q)}<b data-del="${esc(q)}">x</b></span>`).join('');
+  $('saved-searches').querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', e => {
+    const del = e.target.dataset.del;
+    if (del) { setSaved(LS_CS_SAVED, getSaved(LS_CS_SAVED).filter(s=>s!==del)); renderCsChips(); return; }
+    $('cs-text').value = ch.dataset.q; runSearch(0);
+  }));
+}
+
+/* ---------- infinite scroll ---------- */
+addEventListener('scroll', () => {
+  if (innerHeight + scrollY < document.body.scrollHeight - 700) return;
+  if ($('gallery-view').classList.contains('show')) {
+    if (gvHasMore && !gvLoadingMore) { gvLoadingMore=true; openGallery(gvFolderId, gvTitle, gvPage+1).then(()=>gvLoadingMore=false); }
+  } else if ($('search-view').classList.contains('show')) {
+    if (csHasMore && !window.__csBusy && csLastQuery) { window.__csBusy=true;
+      $('cs-text').value=csLastQuery.text; runSearch((parseInt($('cs-grid').dataset.page||'0'))+1).then(()=>window.__csBusy=false); }
+  } else {
+    const sent = $('sentinel');
+    if (sent) renderGridChunk(false);
+  }
+}, { passive:true });
+
+/* ---------- views ---------- */
+function showView(v) {
+  $('community-view').style.display = v==='community'?'block':'none';
+  $('search-view').classList.toggle('show', v==='search');
+  $('gallery-view').classList.toggle('show', v==='gallery');
+  scrollTo(0,0);
+}
+$('tab').addEventListener('change', e => {
+  if (e.target.value==='search'){ showView('search'); renderCsChips(); }
+  else showView('community');
+});
+$('gv-back').addEventListener('click', () => showView('community'));
+
+/* ---------- first-folder shortcut per user ---------- */
+async function browseFirstFolder(username) {
+  const rec = await dbGet(username);
+  const gal = rec && (rec.galleries||[]).find(g=>!/^my favorites$|^watch later$/i.test(g.title)) || rec?.galleries?.[0];
+  if (gal) openGallery(gal.folderId, `${username} · ${gal.title}`);
+  else setStatus('No galleries for '+username);
+}
+
+/* ---------- export ---------- */
+$('export-btn').addEventListener('click', async () => {
+  await openDB();
+  const blob = new Blob([JSON.stringify(await dbAll(),null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'xexle-db.json'; a.click();
+});
+
+/* ---------- session ---------- */
+$('sess-save').addEventListener('click', async () => {
+  SESSION = $('session-in').value.trim();
+  localStorage.setItem(LS_SESSION, SESSION);
+  if (!SESSION) { $('whoami').textContent=''; return; }
+  try {
+    const j = await api({ query:'user.getBySession' });
+    $('whoami').textContent = j.status ? `logged in as ${j.data.username}` : 'invalid session';
+  } catch(e){ $('whoami').textContent=''; }
+});
+
+/* ---------- wire controls ---------- */
+$('load-list').addEventListener('click', ()=>loadCommunityList(true));
+$('min-videos').addEventListener('input', e => { state.MIN_VIDEOS = parseInt(e.target.value,10)||0; renderGridChunk(true); });
+$('txt-search').addEventListener('input', e => { state.SEARCH = e.target.value.toLowerCase().trim(); renderGridChunk(true); });
+$('gal-filter').addEventListener('change', e => { state.GALLERY_FILTER = e.target.value; renderGridChunk(true); });
+$('sort-mode').addEventListener('change', e => { state.SORT_MODE = e.target.value; renderGridChunk(true); });
+$('cs-go').addEventListener('click', ()=>runSearch(0));
+$('cs-text').addEventListener('keydown', e => { if (e.key==='Enter') runSearch(0); });
+
+// save search chip in community tab via Enter+ctrl, or double-click on empty search? keep simple: shift+enter saves
+$('txt-search').addEventListener('keydown', e => {
+  if (e.key==='Enter' && e.shiftKey) {
+    const q = e.target.value.trim(); if (!q) return;
+    const l = getSaved(LS_SAVED); if (!l.includes(q)){ l.push(q); setSaved(LS_SAVED,l);} renderChips();
+  }
+});
+
+/* ---------- boot ---------- */
+SESSION = localStorage.getItem(LS_SESSION)||'';
+if (SESSION) $('session-in').value = SESSION, $('sess-save').click();
+renderChips(); renderCsChips();
+openDB().then(renderCommunity);
+</script>
+</body>
+</html>

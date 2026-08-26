@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Xexle Community Stats v35
 // @namespace    https://xexle.com/scripts/
-// @version      35.0.6
+// @version      35.0.7
 // @description  Community page: badges, scroll-crawl, filters, gallery grid view, recent sort, saved searches, retry queue.
 // @author       shiro
 // @match        https://xexle.com/community*
@@ -13,8 +13,8 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @run-at       document-start
-// @updateURL    https://cdn.jsdelivr.net/gh/Esashiero/xexle-userscript@latest/xexle-community.user.js
-// @downloadURL  https://cdn.jsdelivr.net/gh/Esashiero/xexle-userscript@latest/xexle-community.user.js
+// @updateURL    https://raw.githubusercontent.com/Esashiero/xexle-userscript/main/xexle-community.user.js
+// @downloadURL  https://raw.githubusercontent.com/Esashiero/xexle-userscript/main/xexle-community.user.js
 // @updateInterval 12
 // ==/UserScript==
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Xexle Community Stats v35
 // @namespace    https://xexle.com/scripts/
-// @version      35.0.8
+// @version      35.0.9
 // @description  Community page: badges, scroll-crawl, filters, gallery grid view, recent sort, saved searches, retry queue.
 // @author       shiro
 // @match        https://xexle.com/community*
@@ -671,6 +671,52 @@
         }
     }
 
+    // ============================== GALLERY VIDEO CAPTURE ==============================
+    // xexle loads folder contents through a path our fetch/XHR interceptor can't
+    // reliably see, so on gallery pages we actively pull getFolder ourselves —
+    // we know the exact call + shape (data.list = [{id,title,fileDuration,...}]).
+    async function captureGallery() {
+        const mm = location.pathname.match(/\/favorites\/(\d+)\//);
+        if (!mm) return;
+        const folderId = mm[1];
+        try {
+            const cm = document.cookie.match(/session=([^;]+)/);
+            const session = cm ? decodeURIComponent(cm[1]) : '';
+            let page = 0, pages = 1, captured = 0;
+            while (page < pages) {
+                const body = new URLSearchParams({
+                    query: 'usersFavoriteContent.getFolder',
+                    folderId: folderId,
+                    page: String(page),
+                    session: session
+                });
+                const resp = await fetch('https://api.xexle.com/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body
+                });
+                const j = await resp.json();
+                const d = j && j.data;
+                if (!d || !Array.isArray(d.list)) break;
+                pages = d.pages || 1;
+                const items = d.list.map(it => ({
+                    id: String(it.id ?? it._id ?? it.itemId ?? ''),
+                    title: it.title || '',
+                    fileDuration: it.fileDuration ?? 0,
+                    filePath: it.filePath || '',
+                    previewPicPath: it.previewPicPath || '',
+                    previewVideoPath: it.previewVideoPath || '',
+                    type: it.type || '',
+                    folderId: parseInt(folderId, 10)
+                })).filter(it => it.id);
+                if (items.length) pushItems(items, parseInt(folderId, 10));
+                captured += items.length;
+                page++;
+            }
+            if (captured) console.log('[xc35] captured ' + captured + ' videos from gallery ' + folderId);
+        } catch (e) { /* never break the page */ }
+    }
+
     // ============================== BOOT ==============================
     const mo = new MutationObserver(() => scan());
     const startMo = setInterval(() => {
@@ -679,6 +725,7 @@
             mo.observe(document.body, { childList: true, subtree: true });
             scan();
             initPanel();
+            if (/\/favorites\/\d+\//.test(location.pathname)) captureGallery();
             let tries = 0;
             const waitRows = setInterval(() => {
                 tries++;

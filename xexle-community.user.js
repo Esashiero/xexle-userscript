@@ -5,10 +5,14 @@
 // @description  Community page: badges, scroll-crawl, filters, gallery grid view, recent sort, saved searches, retry queue.
 // @author       shiro
 // @match        https://xexle.com/community*
+// @match        https://xexle.com/favorites/*
+// @match        https://xexle.com/watch/*
+// @match        https://xexle.com/user/*
+// @match        https://xexle.com/search*
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
@@ -82,23 +86,42 @@
 
     // Shared: given the API request body + the parsed JSON response, pull out the
     // video-item list (if any) and push it to the sync server.
+    // Shape-based: finds the largest array of objects that look like xexle content
+    // items (have id + a media field or title), so it works regardless of the
+    // exact envelope key xexle uses.
+    function looksLikeVideoItem(o) {
+        if (!o || typeof o !== 'object') return false;
+        if (o.id === undefined && o._id === undefined) return false;
+        return (o.title !== undefined || o.filePath !== undefined ||
+                o.previewPicPath !== undefined || o.previewVideoPath !== undefined ||
+                o.fileDuration !== undefined || o.contentId !== undefined);
+    }
+    function findVideoArrays(node, depth, found) {
+        try {
+            if (depth > 6) return;
+            if (Array.isArray(node)) {
+                if (node.length && looksLikeVideoItem(node[0])) {
+                    found.push(node);
+                    return;
+                }
+                for (const el of node) findVideoArrays(el, depth + 1, found);
+            } else if (node && typeof node === 'object') {
+                for (const k of Object.keys(node)) findVideoArrays(node[k], depth + 1, found);
+            }
+        } catch (e) { /* never break */ }
+    }
     function maybeCapture(body, json) {
         try {
-            if (!/(getFolder|getFolders|getContent|getFolderMeta|favorite)/i.test(body || '')) return;
-            const data = json && json.data;
-            if (!data) return;
-            // xexle nests the item array in a few possible shapes
-            let list = data.list;
-            if (list && list.items) list = list.items;
-            if (data.items && !list) list = data.items;
-            if (list && !Array.isArray(list)) list = Object.values(list);
-            // only treat as a video list if items look like content (have id+title)
-            if (Array.isArray(list) && list.length &&
-                (list[0].id !== undefined || list[0].title !== undefined)) {
-                const m = /folderId=(\d+)/.exec(body || '');
-                const fid = m ? parseInt(m[1], 10) : null;
-                pushItems(list, fid);
-            }
+            if (!/(getFolder|getFolders|getContent|getFolderMeta|favorite|search|content)/i.test(body || '')) return;
+            const found = [];
+            findVideoArrays(json, 0, found);
+            if (!found.length) return;
+            // pick the largest video array
+            found.sort((a, b) => b.length - a.length);
+            const list = found[0];
+            const m = /folderId=(\d+)/.exec(body || '');
+            const fid = m ? parseInt(m[1], 10) : null;
+            pushItems(list, fid);
         } catch (e) { /* never break the page */ }
     }
 

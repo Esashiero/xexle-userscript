@@ -87,8 +87,11 @@
             try {
                 const body = typeof input === 'string' ? input : (init && init.body) || '';
                 const url = typeof input === 'string' ? input : (input && input.url) || '';
-                if ((url.includes('xexle.com/api') || body.includes('xexle.com/api')) &&
-                    /getFolder\b/.test(body)) {
+                // xexle's gallery API is POST https://api.xexle.com/ with the query
+                // (getFolder, ...) in the request body.
+                const isXexleApi = /(^|\.)xexle\.com$/i.test(new URL(url, location.href).host)
+                                  && /(getFolder|getFolders)/.test(body);
+                if (isXexleApi) {
                     const clone = resp.clone();
                     const txt = await clone.text();
                     const json = JSON.parse(txt);

@@ -80,38 +80,76 @@
         }).catch(() => {});
     }
 
-    function interceptGalleryItems() {
+    // Shared: given the API request body + the parsed JSON response, pull out the
+    // video-item list (if any) and push it to the sync server.
+    function maybeCapture(body, json) {
+        try {
+            if (!/(getFolder|getFolders|getContent|getFolderMeta|favorite)/i.test(body || '')) return;
+            const data = json && json.data;
+            if (!data) return;
+            // xexle nests the item array in a few possible shapes
+            let list = data.list;
+            if (list && list.items) list = list.items;
+            if (data.items && !list) list = data.items;
+            if (list && !Array.isArray(list)) list = Object.values(list);
+            // only treat as a video list if items look like content (have id+title)
+            if (Array.isArray(list) && list.length &&
+                (list[0].id !== undefined || list[0].title !== undefined)) {
+                const m = /folderId=(\d+)/.exec(body || '');
+                const fid = m ? parseInt(m[1], 10) : null;
+                pushItems(list, fid);
+            }
+        } catch (e) { /* never break the page */ }
+    }
+
+    // Hook fetch
+    (function interceptFetch() {
         const orig = window.fetch.bind(window);
         window.fetch = async (input, init) => {
             const resp = await orig(input, init);
             try {
-                const body = typeof input === 'string' ? input : (init && init.body) || '';
-                const url = typeof input === 'string' ? input : (input && input.url) || '';
-                // xexle's gallery API is POST https://api.xexle.com/ with the query
-                // (getFolder, ...) in the request body.
-                const isXexleApi = /(^|\.)xexle\.com$/i.test(new URL(url, location.href).host)
-                                  && /(getFolder|getFolders)/.test(body);
-                if (isXexleApi) {
+                const reqBody = typeof input === 'string' ? input : (init && init.body) || '';
+                if (/(xexle\.com\/api|api\.xexle\.com)/i.test(typeof input === 'string' ? input : (input && input.url) || '')) {
                     const clone = resp.clone();
                     const txt = await clone.text();
-                    const json = JSON.parse(txt);
-                    const data = json && json.data;
-                    // xexle nests the item array in a few possible shapes
-                    let list = data && data.list;
-                    if (list && list.items) list = list.items;
-                    if (data && data.items && !list) list = data.items;
-                    if (list && !Array.isArray(list)) list = Object.values(list);
-                    if (Array.isArray(list) && list.length) {
-                        const m = /folderId=(\d+)/.exec(body);
-                        const fid = m ? parseInt(m[1], 10) : null;
-                        pushItems(list, fid);
-                    }
+                    maybeCapture(reqBody, JSON.parse(txt));
                 }
             } catch (e) { /* never break the page */ }
             return resp;
         };
-    }
-    interceptGalleryItems();
+    })();
+
+    // Hook XMLHttpRequest (xexle's own page JS uses this for getFolder)
+    (function interceptXHR() {
+        const RealXHR = window.XMLHttpRequest;
+        function WrappedXHR() {
+            const xhr = new RealXHR();
+            let reqBody = '';
+            const realOpen = xhr.open;
+            xhr.open = function (method, url) {
+                xhr.__url = url;
+                return realOpen.apply(this, arguments);
+            };
+            const realSend = xhr.send;
+            xhr.send = function (body) {
+                reqBody = body || '';
+                return realSend.apply(this, arguments);
+            };
+            xhr.addEventListener('load', function () {
+                try {
+                    if (/(xexle\.com\/api|api\.xexle\.com)/i.test(xhr.__url || '')) {
+                        maybeCapture(reqBody, JSON.parse(xhr.responseText));
+                    }
+                } catch (e) { /* never break the page */ }
+            });
+            return xhr;
+        }
+        window.XMLHttpRequest = WrappedXHR;
+    })();
+
+    // Fire both patches even if the page already captured a reference to the
+    // originals (hooks run at script load, before most page code executes).
+    void 0;
 
     // ============================== DB ==============================
     function openDB() {

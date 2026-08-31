@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Xexle Community Stats v35
 // @namespace    https://xexle.com/scripts/
-// @version      35.0.9
+// @version      35.0.10
 // @description  Community page: badges, scroll-crawl, filters, gallery grid view, recent sort, saved searches, retry queue.
 // @author       shiro
 // @match        https://xexle.com/community*

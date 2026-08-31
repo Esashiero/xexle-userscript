@@ -717,6 +717,28 @@
         } catch (e) { /* never break the page */ }
     }
 
+    // /user/<name> pages list the user's galleries but the script never synced them.
+    // Reuse fetchFolders + parseFolders (same path as community rows) to pull full
+    // folder metadata, then persist + push. Do NOT pass galleries:[] — that would wipe
+    // folder data on the server (pushToServer maps g.folderId/title/count/avatar/created/lastDt).
+    async function maybeCaptureUserPage() {
+        const m = location.pathname.match(/\/user\/([^/?#]+)/);
+        if (!m) return;
+        const username = decodeURIComponent(m[1]);
+        try {
+            const folders = await fetchFolders(username);
+            if (!folders) return;
+            const { total, galleries } = parseFolders(folders);
+            const rec = {
+                username, total, galleries,
+                lastCrawled: Date.now(), failCount: 0, description: ''
+            };
+            await dbPut(rec);
+            pushToServer(rec);
+            console.log(`[xc35] synced user ${username} (${galleries.length} galleries, ${total} videos)`);
+        } catch (e) { /* never break the page */ }
+    }
+
     // ============================== BOOT ==============================
     const mo = new MutationObserver(() => scan());
     const startMo = setInterval(() => {
@@ -726,6 +748,7 @@
             scan();
             initPanel();
             if (/\/favorites\/\d+\//.test(location.pathname)) captureGallery();
+            if (/\/user\//.test(location.pathname)) maybeCaptureUserPage();
             let tries = 0;
             const waitRows = setInterval(() => {
                 tries++;

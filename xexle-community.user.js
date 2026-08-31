@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Xexle Community Stats v35
 // @namespace    https://xexle.com/scripts/
-// @version      35.0.10
+// @version      35.0.11
 // @description  Community page: badges, scroll-crawl, filters, gallery grid view, recent sort, saved searches, retry queue.
 // @author       shiro
 // @match        https://xexle.com/community*
@@ -675,6 +675,22 @@
     // xexle loads folder contents through a path our fetch/XHR interceptor can't
     // reliably see, so on gallery pages we actively pull getFolder ourselves —
     // we know the exact call + shape (data.list = [{id,title,fileDuration,...}]).
+    // Guard so we only auto-capture each folder once per page session
+    // (the MutationObserver fires on every DOM mutation, including SPA nav).
+    const capturedFolders = new Set();
+
+    // Called from the MutationObserver on every DOM change. If we're now on a
+    // /favorites/{id}/ page (via SPA nav or hard load) and haven't captured this
+    // folder yet, pull its videos and push them to the sync server.
+    function maybeCaptureGallery() {
+        const mm = location.pathname.match(/\/favorites\/(\d+)\//);
+        if (!mm) return;
+        const folderId = mm[1];
+        if (capturedFolders.has(folderId)) return;
+        capturedFolders.add(folderId);
+        captureGallery();
+    }
+
     async function captureGallery() {
         const mm = location.pathname.match(/\/favorites\/(\d+)\//);
         if (!mm) return;
@@ -740,7 +756,7 @@
     }
 
     // ============================== BOOT ==============================
-    const mo = new MutationObserver(() => scan());
+    const mo = new MutationObserver(() => { scan(); maybeCaptureGallery(); });
     const startMo = setInterval(() => {
         if (document.body) {
             clearInterval(startMo);
